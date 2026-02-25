@@ -1,0 +1,5 @@
+seed: 42
+repeats: 1
+warmup_requests: 5
+backend: mock
+quality_config: "configs/quality/quickstart.yaml"

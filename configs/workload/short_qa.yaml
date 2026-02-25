@@ -1,0 +1,32 @@
+# short_qa.yaml
+# 真实业务映射：在线客服 / 搜索问答（高并发、短请求、首 token 敏感）
+# 为什么真实：用户交互型请求通常 prompt 短、回答短，Poisson 到达近似在线访问流量。
+name: short_qa
+seed: 42
+arrival:
+  mode: poisson
+  rps: 12
+  burst_factor: 1.2
+concurrency:
+  max_in_flight: 48
+  timeout_s: 8
+length_dist:
+  prompt_tokens:
+    type: lognormal
+    mean: 64
+    p95: 160
+  output_tokens:
+    type: lognormal
+    mean: 96
+    p95: 220
+turns:
+  mode: single_turn
+  min: 1
+  max: 1
+session:
+  enabled: false
+workload_notes:
+  request_length_distribution: "短 prompt + 短回答，覆盖 FAQ / 客服问答"
+  arrival_pattern: "Poisson 为主，轻微 burst 模拟流量尖峰"
+  multi_turn_characteristics: "单轮请求，无上下文累积"
+  business_scenario: "客服、站内搜索、FAQ Bot"

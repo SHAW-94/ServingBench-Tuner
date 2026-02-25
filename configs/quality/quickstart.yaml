@@ -1,0 +1,17 @@
+eval_pack: "data/eval_pack/quickstart_eval.jsonl"
+evaluators:
+  - name: exact_match
+    for_types: ["closed_qa"]
+  - name: json_schema
+    for_types: ["json_schema"]
+  - name: llm_judge
+    for_types: ["judge"]
+    # For quickstart, you can set judge_backend=mock so CI/CPU works.
+    judge_backend: "mock"
+    temperature: 0
+    seed: 42
+
+gate:
+  min_overall: 0.80
+  min_relative_to_baseline: 0.98
+  hard_fail_tasks: ["json_schema"]

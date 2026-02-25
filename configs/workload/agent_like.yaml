@@ -1,0 +1,35 @@
+# agent_like.yaml
+# 真实业务映射：Agent / RAG 多步任务（同一 session 多轮、上下文增长）
+# 为什么真实：多轮任务会让 prefill 与排队更容易放大，是生产尾延迟治理的典型场景。
+name: agent_like
+seed: 42
+arrival:
+  mode: poisson_burst
+  rps: 5.5
+  burst_factor: 1.8
+concurrency:
+  max_in_flight: 64
+  timeout_s: 20
+length_dist:
+  prompt_tokens:
+    type: session_growth
+    first_turn_mean: 320
+    per_turn_growth_mean: 180
+    p95_final_turn: 1400
+  output_tokens:
+    type: normal
+    mean: 260
+    std: 90
+turns:
+  mode: multi_turn
+  min: 3
+  max: 6
+  context_accumulation: true
+session:
+  enabled: true
+  think_time_s: {type: uniform, low: 0.2, high: 1.2}
+workload_notes:
+  request_length_distribution: "首轮中等，后续轮次上下文持续增长（贴近 Agent/RAG）"
+  arrival_pattern: "Poisson + burst，模拟用户集中触发和工具调用回流"
+  multi_turn_characteristics: "3~6 轮，同一 session 累积上下文，TTFT/P95 更易恶化"
+  business_scenario: "Agent 工作流、RAG 问答、多轮 Copilot"

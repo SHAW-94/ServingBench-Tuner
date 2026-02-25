@@ -1,0 +1,3 @@
+{"id":"qa_1","type":"closed_qa","prompt":"1+1=?","expected":"2"}
+{"id":"json_1","type":"json_schema","prompt":"Return JSON: {\"name\": string, \"age\": integer}. Use name=Alice age=30.","schema":{"type":"object","properties":{"name":{"type":"string"},"age":{"type":"integer"}},"required":["name","age"],"additionalProperties":false}}
+{"id":"sum_1","type":"judge","prompt":"Summarize: ServingBench-Tuner measures latency and cost under quality constraints.","rubric":"Clarity and faithfulness. Score 1-5."}

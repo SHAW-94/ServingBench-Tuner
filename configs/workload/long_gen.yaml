@@ -1,0 +1,35 @@
+# long_gen.yaml
+# 真实业务映射：内容生成 / 摘要 / 报告生成（中低并发、长输出、吞吐敏感）
+# 为什么真实：这类任务 decode 阶段占主导，吞吐与尾延迟稳定性比纯 TTFT 更关键。
+name: long_gen
+seed: 42
+arrival:
+  mode: poisson
+  rps: 3.5
+  burst_factor: 1.1
+concurrency:
+  max_in_flight: 64
+  timeout_s: 60
+length_dist:
+  prompt_tokens:
+    type: mixture
+    components:
+      - weight: 0.6
+        dist: {type: normal, mean: 512, std: 180}
+      - weight: 0.4
+        dist: {type: normal, mean: 1200, std: 300}
+  output_tokens:
+    type: lognormal
+    mean: 700
+    p95: 1600
+turns:
+  mode: single_turn
+  min: 1
+  max: 1
+session:
+  enabled: false
+workload_notes:
+  request_length_distribution: "中长 prompt + 长输出，覆盖长摘要/改写/内容生成"
+  arrival_pattern: "Poisson 低速到达，更接近异步内容任务"
+  multi_turn_characteristics: "单轮请求，但输出长、decode 占比高"
+  business_scenario: "内容生成、摘要、报告撰写"

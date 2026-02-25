@@ -1,0 +1,112 @@
+{# Robust Markdown report template #}
+{% set _wl = workload if workload is defined and workload else {} %}
+{% set _ts = tuning_summary if tuning_summary is defined and tuning_summary else {} %}
+{% set _recs = recommendations if recommendations is defined and recommendations else {} %}
+{% set _topk = _recs.get("topk", []) if _recs is mapping else [] %}
+{% set _plots = plots if plots is defined and plots else {} %}
+{% set _rows = rows if rows is defined and rows else [] %}
+{% set _constraints = constraints if constraints is defined and constraints else {} %}
+{% set _objective = objective if objective is defined and objective else {} %}
+{% set _risk = risk_hints if risk_hints is defined and risk_hints else [] %}
+
+# {{ title | default("ServingBench-Tuner 推荐报告") }}
+
+- **workload**: `{{ _wl.get("name", "-") }}`
+- **scenario**: {{ _wl.get("scenario", "-") }}
+- **run_id**: `{{ run_id | default(_ts.get("run_id", "-")) }}`
+- **algo**: `{{ _ts.get("algo", "-") }}`
+- **feasible**: `{{ _ts.get("n_feasible", "-") }}/{{ _ts.get("n_candidates", "-") }}`
+
+## 业务场景说明
+{{ _wl.get("description", "未提供 workload 描述。") }}
+
+## 推荐配置卡片（Top-1 / Top-3）
+
+{% if _topk %}
+{% for r in _topk[:3] %}
+{% set ov = r.get("objective_values", {}) if r is mapping else {} %}
+### Top {{ loop.index }} · Candidate #{{ r.get("candidate_idx", "-") }}
+
+- note: {{ r.get("note", "") }}
+- P95: {{ "%.3f"|format((ov.get("latency_p95_s", ov.get("p95_s", 0.0)))|float) }} s
+- TTFT P95: {{ "%.3f"|format((ov.get("ttft_p95_s", 0.0))|float) }} s
+- tok/s: {{ "%.2f"|format((ov.get("tok_s", ov.get("throughput_tok_s", 0.0)))|float) }}
+- VRAM peak: {{ "%.0f"|format((ov.get("vram_peak_mb", 0.0))|float) }} MB
+- cost proxy: {{ "%.4f"|format((ov.get("cost_proxy", 0.0))|float) }}
+
+**params**
+```json
+{{ (r.get("params", {}) if r is mapping else {}) | tojson(indent=2) }}
+```
+
+{% if r.get("serving_config") %}
+**serving_config**
+```json
+{{ r.get("serving_config", {}) | tojson(indent=2) }}
+```
+{% endif %}
+
+{% endfor %}
+{% else %}
+- 暂无推荐结果（可能没有可行解或上游未写入推荐列表）。
+{% endif %}
+
+## 约束与目标（用于解释为什么这样推荐）
+
+### Constraints
+```json
+{{ _constraints | tojson(indent=2) }}
+```
+
+### Objective
+```json
+{{ _objective | tojson(indent=2) }}
+```
+
+## 正式对照实验结论表（Baseline vs Random vs NSGA-II）
+
+{% if _rows %}
+| Method | Algo | Feasible | Quality | P95(s) | TTFT P95(s) | tok/s | VRAM(MB) | Tail Amp | Timeout | Cost |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+{% for row in _rows %}
+| {{ row.get("method","-") }} | {{ row.get("algo","-") }} | {{ "Y" if row.get("is_feasible") else "N" }} | {{ "%.3f"|format((row.get("quality",0))|float) }} | {{ "%.3f"|format((row.get("p95_s",0))|float) }} | {{ "%.3f"|format((row.get("ttft_p95_s",0))|float) }} | {{ "%.1f"|format((row.get("tok_s",0))|float) }} | {{ "%.0f"|format((row.get("vram_peak_mb",0))|float) }} | {{ "%.2f"|format((row.get("tail_amp",0))|float) }} | {{ "%.3f"|format((row.get("timeout_rate",0))|float) }} | {{ "%.4f"|format((row.get("cost_proxy",0))|float) }} |
+{% endfor %}
+{% else %}
+- 未找到 comparison rows（`results/formal_comparison/comparison_summary.json`）。
+{% endif %}
+
+## 尾延迟归因（杀手锏）
+
+{% if _plots.get("tail_png") %}
+- tail attribution 图：`{{ _plots.get("tail_png") }}`
+{% else %}
+- 未生成 tail attribution 图（缺少 `tail_compare.json` 或 traces 数据）。
+{% endif %}
+
+{% if _rows %}
+### 关键分解数值（P95）
+| Method | queue_p95 | prefill_p95 | decode_p95 | retry_rate |
+|---|---:|---:|---:|---:|
+{% for row in _rows %}
+| {{ row.get("method","-") }} | {{ "%.3f"|format((row.get("queue_p95_s",0))|float) }} | {{ "%.3f"|format((row.get("prefill_p95_s",0))|float) }} | {{ "%.3f"|format((row.get("decode_p95_s",0))|float) }} | {{ "%.2f"|format(((row.get("retry_rate",0))|float) * 100.0) }}% |
+{% endfor %}
+{% endif %}
+
+## Pareto 搜索图
+
+{% if _plots.get("pareto_png") %}
+- Pareto 图：`{{ _plots.get("pareto_png") }}`
+{% else %}
+- 未生成 Pareto 图（缺少 candidate artifacts）。
+{% endif %}
+
+## 风险提示 / 生产建议
+
+{% if _risk %}
+{% for h in _risk %}
+- {{ h }}
+{% endfor %}
+{% else %}
+- 暂无额外风险提示。
+{% endif %}
+

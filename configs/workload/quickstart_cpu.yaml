@@ -1,0 +1,22 @@
+name: "quickstart_cpu"
+seed: 42
+arrival:
+  mode: replay
+  trace_path: "data/workloads/quickstart_trace.jsonl"
+concurrency_limit: 8
+timeout_s: 10.0
+retries: 0
+length_dist:
+  prompt:
+    type: empirical
+    path: "data/workloads/quickstart_len_prompt.json"
+  output:
+    type: empirical
+    path: "data/workloads/quickstart_len_output.json"
+sessions:
+  enabled: true
+  turns: 3
+  context_growth: agent_like
+  max_context_tokens: 2048
+warmup_requests: 5
+duration_s: 30

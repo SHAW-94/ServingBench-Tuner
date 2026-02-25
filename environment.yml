@@ -1,0 +1,34 @@
+name: servingbench
+channels:
+  - conda-forge
+  - pytorch
+  - nvidia
+dependencies:
+  - python=3.10
+  - pip
+  - git
+  - openssl
+  - ca-certificates
+
+  # Common scientific stack (conda wheels are usually smoother)
+  - numpy>=1.26
+  - pandas>=2.2
+  - matplotlib>=3.8
+
+  # Optional: If you want PyTorch via conda (recommended for GPU stability)
+  # Choose ONE of the following blocks depending on your environment:
+  #
+  # --- CPU-only torch ---
+  # - pytorch>=2.3
+  # - cpuonly
+  #
+  # --- GPU torch (example for CUDA 12.1) ---
+  # - pytorch>=2.3
+  # - pytorch-cuda=12.1
+
+  - pip:
+      # Install project in editable mode after cloning repo:
+      #   pip install -e ".[dev]"
+      # For GPU: pip install -e ".[gpu,dev]"
+      # For CPU: pip install -e ".[cpu,dev]"
+      - -e .

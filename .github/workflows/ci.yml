@@ -1,0 +1,96 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+
+jobs:
+  cpu-logic-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.lock.txt', 'pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies (base + dev)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python -m pip install -U pip
+          # Base locked deps
+          pip install -r requirements.lock.txt
+          # Project + dev extras (ruff/black/pytest/pre-commit)
+          pip install -e ".[dev]"
+
+      - name: Lint (ruff) + Format check (ruff-format)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ruff check .
+          ruff format --check .
+
+      - name: Pre-commit (optional, non-blocking)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          # If hooks are too strict early stage, you can make this blocking later.
+          pre-commit run --all-files || true
+
+      - name: Unit tests (if present)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          # pytest exits with code 5 when no tests collected; treat that as success.
+          pytest -q || rc=$?
+          if [ "${rc:-0}" -eq 5 ]; then
+            echo "No tests collected (ok for early stage)."
+            exit 0
+          fi
+          exit "${rc:-0}"
+
+      - name: Generate tiny public workload (synthetic)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p data/workloads
+          python scripts/make_public_workload.py --out-dir data/workloads --profiles quickstart --n-requests 30 --seed 42
+
+      - name: Export env signature (CI)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p results/artifacts
+          python scripts/export_env_signature.py --out results/artifacts/env_signature_ci.json
+
+      - name: CPU quickstart pipeline (mock backend) - conditional
+        shell: bash
+        run: |
+          set -euxo pipefail
+          chmod +x scripts/quickstart_cpu.sh
+          # If package not yet implemented, quickstart_cpu.sh will exit 0 after printing guidance.
+          ./scripts/quickstart_cpu.sh
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-artifacts
+          path: |
+            results/
+            reports/
+            data/workloads/quickstart_*
+          if-no-files-found: ignore

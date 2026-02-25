@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>{{ title | default("ServingBench-Tuner 推荐报告") }}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; margin: 24px; color: #111; line-height: 1.5; }
+    h1, h2, h3 { margin-top: 1.2em; }
+    .muted { color: #666; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 12px; }
+    .kv { margin: 0; padding: 0; list-style: none; }
+    .kv li { margin: 4px 0; }
+    table { border-collapse: collapse; width: 100%; font-size: 14px; }
+    th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: right; }
+    th:first-child, td:first-child { text-align: left; }
+    th:nth-child(2), td:nth-child(2) { text-align: left; }
+    pre { background: #f7f7f7; padding: 10px; border-radius: 8px; overflow: auto; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    img.plot { max-width: 100%; border: 1px solid #ddd; border-radius: 8px; }
+    .ok { color: #0a7f2e; font-weight: 600; }
+    .bad { color: #a40000; font-weight: 600; }
+  </style>
+</head>
+<body>
+{% set _wl = workload if workload is defined and workload else {} %}
+{% set _ts = tuning_summary if tuning_summary is defined and tuning_summary else {} %}
+{% set _recs = recommendations if recommendations is defined and recommendations else {} %}
+{% set _topk = _recs.get("topk", []) if _recs is mapping else [] %}
+{% set _rows = rows if rows is defined and rows else [] %}
+{% set _plots = plots if plots is defined and plots else {} %}
+{% set _risk = risk_hints if risk_hints is defined and risk_hints else [] %}
+{% set _constraints = constraints if constraints is defined and constraints else {} %}
+{% set _objective = objective if objective is defined and objective else {} %}
+
+<h1>{{ title | default("ServingBench-Tuner 推荐报告") }}</h1>
+<p class="muted">
+  workload=<code>{{ _wl.get("name", "-") }}</code> · scenario={{ _wl.get("scenario", "-") }}
+  · run_id=<code>{{ run_id | default(_ts.get("run_id", "-")) }}</code>
+  · algo=<code>{{ _ts.get("algo", "-") }}</code>
+  · feasible=<code>{{ _ts.get("n_feasible", "-") }}/{{ _ts.get("n_candidates", "-") }}</code>
+</p>
+
+<h2>业务场景说明</h2>
+<p>{{ _wl.get("description", "未提供 workload 描述。") }}</p>
+
+<h2>推荐配置卡片</h2>
+<div class="grid">
+{% if _topk %}
+{% for r in _topk[:3] %}
+{% set ov = r.get("objective_values", {}) if r is mapping else {} %}
+<div class="card">
+  <h3>Top {{ loop.index }} · Candidate #{{ r.get("candidate_idx", "-") }}</h3>
+  <ul class="kv">
+    <li>note: {{ r.get("note", "") }}</li>
+    <li>P95: <b>{{ "%.3f"|format((ov.get("latency_p95_s", ov.get("p95_s", 0)))|float) }}</b> s</li>
+    <li>TTFT P95: <b>{{ "%.3f"|format((ov.get("ttft_p95_s", 0))|float) }}</b> s</li>
+    <li>tok/s: <b>{{ "%.1f"|format((ov.get("tok_s", ov.get("throughput_tok_s", 0)))|float) }}</b></li>
+    <li>VRAM: <b>{{ "%.0f"|format((ov.get("vram_peak_mb", 0))|float) }}</b> MB</li>
+    <li>cost proxy: <b>{{ "%.4f"|format((ov.get("cost_proxy", 0))|float) }}</b></li>
+  </ul>
+  <details>
+    <summary>params</summary>
+    <pre>{{ (r.get("params", {}) if r is mapping else {}) | tojson(indent=2) }}</pre>
+  </details>
+  {% if r.get("serving_config") %}
+  <details>
+    <summary>serving_config</summary>
+    <pre>{{ r.get("serving_config", {}) | tojson(indent=2) }}</pre>
+  </details>
+  {% endif %}
+</div>
+{% endfor %}
+{% else %}
+<div class="card">暂无推荐结果（可能没有可行解或上游未写入推荐列表）。</div>
+{% endif %}
+</div>
+
+<h2>正式对照实验结论表</h2>
+{% if _rows %}
+<table>
+  <thead>
+    <tr>
+      <th>Method</th><th>Algo</th><th>Feasible</th><th>Quality</th><th>P95(s)</th><th>TTFT P95(s)</th>
+      <th>tok/s</th><th>VRAM(MB)</th><th>Tail</th><th>Timeout</th><th>Cost</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in _rows %}
+    <tr>
+      <td>{{ row.get("method","-") }}</td>
+      <td>{{ row.get("algo","-") }}</td>
+      <td>{% if row.get("is_feasible") %}<span class="ok">Y</span>{% else %}<span class="bad">N</span>{% endif %}</td>
+      <td>{{ "%.3f"|format((row.get("quality",0))|float) }}</td>
+      <td>{{ "%.3f"|format((row.get("p95_s",0))|float) }}</td>
+      <td>{{ "%.3f"|format((row.get("ttft_p95_s",0))|float) }}</td>
+      <td>{{ "%.1f"|format((row.get("tok_s",0))|float) }}</td>
+      <td>{{ "%.0f"|format((row.get("vram_peak_mb",0))|float) }}</td>
+      <td>{{ "%.2f"|format((row.get("tail_amp",0))|float) }}</td>
+      <td>{{ "%.3f"|format((row.get("timeout_rate",0))|float) }}</td>
+      <td>{{ "%.4f"|format((row.get("cost_proxy",0))|float) }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">未找到 comparison rows（`results/formal_comparison/comparison_summary.json`）。</p>
+{% endif %}
+
+<h2>尾延迟归因</h2>
+{% if _plots.get("tail_png") %}
+<p><img class="plot" src="{{ _plots.get("tail_png") }}" alt="tail attribution plot" /></p>
+{% else %}
+<p class="muted">未生成 tail attribution 图（缺少 tail_compare.json 或 traces 数据）。</p>
+{% endif %}
+
+<h2>Pareto 搜索图</h2>
+{% if _plots.get("pareto_png") %}
+<p><img class="plot" src="{{ _plots.get("pareto_png") }}" alt="pareto plot" /></p>
+{% else %}
+<p class="muted">未生成 Pareto 图（缺少 candidate artifacts）。</p>
+{% endif %}
+
+<h2>约束与目标</h2>
+<div class="grid">
+  <div class="card">
+    <h3>Constraints</h3>
+    <pre>{{ _constraints | tojson(indent=2) }}</pre>
+  </div>
+  <div class="card">
+    <h3>Objective</h3>
+    <pre>{{ _objective | tojson(indent=2) }}</pre>
+  </div>
+</div>
+
+<h2>风险提示</h2>
+{% if _risk %}
+<ul>
+{% for h in _risk %}
+  <li>{{ h }}</li>
+{% endfor %}
+</ul>
+{% else %}
+<p class="muted">暂无额外风险提示。</p>
+{% endif %}
+
+</body>
+</html>
+

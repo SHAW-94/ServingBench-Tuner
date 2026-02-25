@@ -1,0 +1,33 @@
+algorithm: nsga2
+seed: 42
+population: 8
+generations: 3
+objectives:
+  - name: p95_latency_s
+    direction: minimize
+  - name: cost_proxy
+    direction: minimize
+  - name: tok_s
+    direction: maximize
+constraints:
+  max_timeout_rate: 0.05
+  max_vram_mb: 999999     # mock backend ignores; keeps interface consistent
+  min_quality_overall: 0.80
+search_space:
+  # keep <= 10 params for MVP (mock backend can still simulate effects)
+  concurrency:
+    type: int
+    low: 1
+    high: 16
+  max_new_tokens:
+    type: int
+    low: 32
+    high: 256
+  max_batch_tokens:
+    type: int
+    low: 512
+    high: 4096
+  kv_cache_limit_mb:
+    type: int
+    low: 256
+    high: 4096

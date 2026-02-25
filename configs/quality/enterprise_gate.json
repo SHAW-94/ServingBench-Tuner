@@ -1,0 +1,8 @@
+{
+  "min_overall_relative": 0.98,
+  "min_qa_relative": 0.99,
+  "min_structured_relative": 0.99,
+  "min_code_relative": 0.97,
+  "min_summary_relative": 0.98,
+  "min_structured_absolute": 0.98
+}
